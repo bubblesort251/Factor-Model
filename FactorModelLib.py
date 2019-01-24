@@ -285,11 +285,11 @@ def cross_validated_lasso_regression(data, dependentVar, factorNames, options):
     tuned_parameters = [{'alpha': alphas}]
 
     clf = GridSearchCV(lassoTest, tuned_parameters, cv=options['nFolds'], refit=False) 
-    clf.fit(newData[factornames],newData[dependentVar])
+    clf.fit(newData[factorNames],newData[dependentVar])
 
     alphaBest = alphas[np.argmax(clf.cv_results_['mean_test_score'])]
     lassoBest = Lasso(alpha=alphaBest, fit_intercept=True)
-    lassoBest.fit(newData[factornames],newData[dependentVar])
+    lassoBest.fit(newData[factorNames],newData[dependentVar])
 
 
     if (options['printLoadings'] == True):
@@ -298,7 +298,7 @@ def cross_validated_lasso_regression(data, dependentVar, factorNames, options):
         print('best lambda = ' + str(alphaBest*2*data.shape[0]))
 
         #Now print the factor loadings
-        display_factor_loadings(lassoBest.intercept_, lassoBest.coef_, factornames, options)
+        display_factor_loadings(lassoBest.intercept_, lassoBest.coef_, factorNames, options)
 
     if(options['returnModel']):
         return lassoBest
