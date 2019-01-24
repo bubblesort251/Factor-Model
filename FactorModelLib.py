@@ -93,12 +93,12 @@ def print_timeperiod(data, dependentVar, options):
     else:
         print ('Time period is ' + options['timeperiod'])
 
-def display_factor_loadings(intercept, coefs, factornames, options):
-    '''display_factor_loadings takes an intercept, coefs, factornames and options dict, and prints the factor loadings in a readable way
+def display_factor_loadings(intercept, coefs, factorNames, options):
+    '''display_factor_loadings takes an intercept, coefs, factorNames and options dict, and prints the factor loadings in a readable way
     INPUTS:
         intercept: float, intercept value
         coefs: np array, coeficients from pandas df
-        factornames: list, names of the factors
+        factorNames: list, names of the factors
         options: dict, should contain at least one key, nameOfReg
             nameOfReg: string, name for the regression
     Outputs:
@@ -111,7 +111,7 @@ def display_factor_loadings(intercept, coefs, factornames, options):
         name = options['nameOfReg']
     out = pd.DataFrame(loadings, columns=[name])
     out = out.transpose()
-    fullNames = ['Intercept'] + factornames
+    fullNames = ['Intercept'] + factorNames
     out.columns = fullNames
     print(out)
 
@@ -133,10 +133,10 @@ def best_subset(x,y,l_0):
 
 
 #First function, linear factor model build
-def linear_regression(data, dependentVar, factornames, options):
+def linear_regression(data, dependentVar, factorNames, options):
     '''linear_regression takes in a dataset and returns the factor loadings using least squares regression
     INPUTS:
-        data: pandas df, data matrix, should constain the date column and all of the factornames columns
+        data: pandas df, data matrix, should constain the date column and all of the factorNames columns
         dependentVar: string, name of dependent variable
         factorNames: list, elements should be strings, names of the independent variables
         options: dictionary, should constain at least two elements, timeperiod, and date
@@ -156,22 +156,22 @@ def linear_regression(data, dependentVar, factornames, options):
 
     #perform linear regression
     linReg = LinearRegression(fit_intercept=True)
-    linReg.fit(newData[factornames], newData[dependentVar])
+    linReg.fit(newData[factorNames], newData[dependentVar])
     
     if (options['printLoadings'] == True):
         #Now print the results
         print_timeperiod(newData, dependentVar, options)
         # Now print the factor loadings
-        display_factor_loadings(linReg.intercept_, linReg.coef_, factornames, options)
+        display_factor_loadings(linReg.intercept_, linReg.coef_, factorNames, options)
 
     if(options['returnModel']):
         return linReg
 
 
-def lasso_regression(data, dependentVar, factornames, options):
+def lasso_regression(data, dependentVar, factorNames, options):
     '''linear_regression takes in a dataset and returns the factor loadings using least squares regression
     INPUTS:
-        data: pandas df, data matrix, should constain the date column and all of the factornames columns
+        data: pandas df, data matrix, should constain the date column and all of the factorNames columns
         dependentVar: string, name of dependent variable
         factorNames: list, elements should be strings, names of the independent variables
         options: dictionary, should constain at least two elements, timeperiod, and date
@@ -196,7 +196,7 @@ def lasso_regression(data, dependentVar, factornames, options):
 
     #perform linear regression
     lassoReg = Lasso(alpha=options['lambda']/(2*data.shape[0]), fit_intercept=True)
-    lassoReg.fit(newData[factornames], newData[dependentVar])
+    lassoReg.fit(newData[factorNames], newData[dependentVar])
     
     if (options['printLoadings'] == True):
         #Now print the results
@@ -204,15 +204,15 @@ def lasso_regression(data, dependentVar, factornames, options):
         print('lambda = ' + str(options['lambda']))
 
         #Now print the factor loadings
-        display_factor_loadings(lassoReg.intercept_, lassoReg.coef_, factornames, options)
+        display_factor_loadings(lassoReg.intercept_, lassoReg.coef_, factorNames, options)
 
     if(options['returnModel']):
         return lassoReg
 
-def best_subset_regression(data, dependentVar, factornames, options):
+def best_subset_regression(data, dependentVar, factorNames, options):
     '''best_subset_regression takes in a dataset and returns the factor loadings using best subset regression
     INPUTS:
-        data: pandas df, data matrix, should constain the date column and all of the factornames columns
+        data: pandas df, data matrix, should constain the date column and all of the factorNames columns
         dependentVar: string, name of dependent variable
         factorNames: list, elements should be strings, names of the independent variables
         options: dictionary, should constain at least two elements, timeperiod, and date
@@ -236,22 +236,22 @@ def best_subset_regression(data, dependentVar, factornames, options):
         newData = newData.query(options['timeperiod'])
 
     #perform linear regression
-    alpha, beta = best_subset(data[factornames].values, data[dependentVar].values, options['maxVars'])
+    alpha, beta = best_subset(data[factorNames].values, data[dependentVar].values, options['maxVars'])
     
     if (options['printLoadings'] == True):
         #Now print the results
         print_timeperiod(newData, dependentVar, options)
 
         #Now print the factor loadings
-        display_factor_loadings(alpha, beta, factornames, options)
+        display_factor_loadings(alpha, beta, factorNames, options)
 
     if(options['returnModel']):
         return alpha, beta
 
-def cross_validated_lasso_regression(data, dependentVar, factornames, options):
+def cross_validated_lasso_regression(data, dependentVar, factorNames, options):
     '''best_subset_regression takes in a dataset and returns the factor loadings using best subset regression
     INPUTS:
-        data: pandas df, data matrix, should constain the date column and all of the factornames columns
+        data: pandas df, data matrix, should constain the date column and all of the factorNames columns
         dependentVar: string, name of dependent variable
         factorNames: list, elements should be strings, names of the independent variables
         options: dictionary, should constain at least two elements, timeperiod, and date
@@ -303,6 +303,30 @@ def cross_validated_lasso_regression(data, dependentVar, factornames, options):
     if(options['returnModel']):
         return lassoBest
 
+def run_factor_model(data, dependentVar, factorNames, method, options):
+    '''run_Factor_model allows you to specify the method to create a model, returns a model object according to the method you chose
+    INPUTS:
+        data: pandas df, must contain the columns specified in factorNames and dependentVar
+        dependentVar: string, dependent variable
+        factorNames: list of strings, names of independent variables
+        method: string, name of method to be used.  Supports OLS, LASSO, CVLASSO atm
+        options: dictionary object, controls the hyperparameters of the method
+    Outputs:
+        out: model object'''
+
+    #Make sure the options dictionary has the correct settings
+    options['returnModel'] = True
+    options['printLoadings'] = False
+
+    #Now create the appropriate model
+    if (method == 'OLS'): #run linear model
+        return linear_regression(data, dependentVar, factorNames, options)
+    if (method == 'LASSO'):
+        return lasso_regression(data, dependentVar, factorNames, options)
+    if (method == 'CVLasso'):
+        return cross_validated_lasso_regression(data, dependentVar, factorNames, options)
+    else:
+        print ('Method ' + method + ' not supported')
 
 
 #Asorted Nonsense
