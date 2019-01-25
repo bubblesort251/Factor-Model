@@ -31,10 +31,13 @@ def plot_returns(data, name, flag='Total Return', date='Date'):
         print ('column ' + name + ' not in pandas df')
         return
     #If the inputs are clean, create the plot
+    data = data.sort_values(date).copy()
+    data.reset_index(drop=True, inplace=True)
+    data[date] = pd.to_datetime(data[date])
 
     if (flag == 'Total Return'):
         n = data.shape[0]
-        totalReturns = np.zeros(n)
+        totalReturns = np.zeros((n,1))
         totalReturns[0] = 1.
         for i in range(1,n):
             totalReturns[i] = totalReturns[i-1]*(1+data[name][i])
@@ -246,7 +249,10 @@ def best_subset_regression(data, dependentVar, factorNames, options):
         display_factor_loadings(alpha, beta, factorNames, options)
 
     if(options['returnModel']):
-        return alpha, beta
+        out = LinearRegression()
+        out.intercept_ = alpha[0]
+        out.coef_ = beta
+        return out
 
 def cross_validated_lasso_regression(data, dependentVar, factorNames, options):
     '''best_subset_regression takes in a dataset and returns the factor loadings using best subset regression

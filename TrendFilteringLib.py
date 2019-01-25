@@ -108,6 +108,10 @@ def plot_returns_regime(data, factorName, regimeName, flag='Total Return', date=
     #If the inputs are clean, create the plot
 
     #Step 1: Parse the regime list
+    data = data.sort_values(date).copy()
+    data.reset_index(drop=True, inplace=True)
+    data[date] = pd.to_datetime(data[date])
+
     listOfRegimes = parseBetaSeries(data, regimeName)
 
     #Now create plot
