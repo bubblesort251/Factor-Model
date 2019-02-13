@@ -88,14 +88,16 @@ def parseBetaSeries(data, regimeCol):
 
 
 
-def plot_returns_regime(data, factorName, regimeName, flag='Total Return', date='Date', ymaxvar=8000):
+def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='Date', ymaxvar=8000, pathToSavePlot = False):
     '''plot_returns returns a plot of the returns
     INPUTS:
         factorName: string, name of column to be plotted
         data: pd dataframe, where the data is housed
+        regimeCol: string, name of the regime column in the pandas df: data
         flag: string, Either Total Return or Monthly Return
         date: string, column name corresponding to the date variable
         ymaxvar: optional argument, sets max of the plot
+        pathToSavePlot: if specified, saves the plot at the specific path instead of showing the plot
     Outputs:
         a plot'''
     #Clean Inputs:
@@ -112,7 +114,7 @@ def plot_returns_regime(data, factorName, regimeName, flag='Total Return', date=
     data.reset_index(drop=True, inplace=True)
     data[date] = pd.to_datetime(data[date])
 
-    listOfRegimes = parseBetaSeries(data, regimeName)
+    listOfRegimes = parseBetaSeries(data, regimeCol)
 
     #Now create plot
     if (flag == 'Total Return'):
@@ -130,7 +132,11 @@ def plot_returns_regime(data, factorName, regimeName, flag='Total Return', date=
         plt.title(factorName + ' Total Return Over Time')
         plt.ylabel(factorName)
         plt.xlabel('Date')
-        plt.show()
+        if(pathToSavePlot):
+            path = pathToSavePlot + 'RegimeGraph.png'
+            plt.savefig(path)
+        else:
+            plt.show()
 
     elif (flag == 'Relative Return'):
         ymaxvar = max(data[factorName])
@@ -141,6 +147,10 @@ def plot_returns_regime(data, factorName, regimeName, flag='Total Return', date=
         plt.title(factorName + ' Returns Over Time')
         plt.ylabel(factorName)
         plt.xlabel('Date')
-        plt.show()
+        if(pathToSavePlot):
+            path = pathToSavePlot + 'RegimeGraph.png'
+            plt.savefig(path)
+        else:
+            plt.show()
     else:
         print ('flag variable must be either Total Return or Relative Return')
