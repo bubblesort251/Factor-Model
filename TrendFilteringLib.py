@@ -88,7 +88,7 @@ def parseBetaSeries(data, regimeCol):
 
 
 
-def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='Date', ymaxvar=8000, pathToSavePlot = False):
+def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='Date', ymaxvar=20, pathToSavePlot = False):
     '''plot_returns returns a plot of the returns
     INPUTS:
         factorName: string, name of column to be plotted
