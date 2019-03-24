@@ -17,7 +17,7 @@ dateName = 'Date'
 #User Analysis Section.  Change the variables in this section to run user specific analysis
 
 #isDemo is a boolean variable, set to True if the user wants to run custom analysis
-isDemo = False
+isDemo = True
 
 #dataPathUser: Path to User Defined Data
 dataPathUser = 'Data/Data_Oct2018_v2.csv'
