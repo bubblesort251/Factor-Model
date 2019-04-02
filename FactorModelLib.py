@@ -493,8 +493,8 @@ def cross_validated_elastic_net_regression(data, dependentVar, factorNames, opti
     if (options['printLoadings'] == True):
         #Now print the results
         print_timeperiod(newData, dependentVar, options)
-        print('best lambda = ' + str(alphaBest*2*newData.shape[0]))
-        print('best l1Ratio = ' + str(l1RatioBest))
+        print('best lambda1 = ' + str(alphaBest*2*newData.shape[0]*l1RatioBest))
+        print('best lambda2 = ' + str(newData.shape[0]*alphaBest*(1-l1RatioBest)))
         #Now print the factor loadings
         display_factor_loadings(elasticNetBest.intercept_, elasticNetBest.coef_, factorNames, options)
 
