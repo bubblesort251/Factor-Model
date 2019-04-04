@@ -17,7 +17,7 @@ dateName = 'Date'
 #User Analysis Section.  Change the variables in this section to run user specific analysis
 
 #isDemo is a boolean variable, set to True if the user wants to run custom analysis
-isDemo = True
+isDemo = False
 
 #dataPathUser: Path to User Defined Data
 dataPathUser = 'Data/Data_Oct2018_v2.csv'
@@ -26,7 +26,19 @@ dataPathUser = 'Data/Data_Oct2018_v2.csv'
 factorNameUser= ['World Equities','US Treasuries','Bond Risk Premium','Inflation Protection','Currency Protection']
 
 #assetNameUser: List, defines the asset to be used
-assetNameUser = 'US Equities'
+assetNameUser = 'Commodities'
 
 #dateName: string, date column
 dateNameUser = 'Date'
+
+#Start and End Dates for the Analysis
+startDateUser = '2001-01-01'
+endDateUser = '2018-12-31'
+
+
+#Best Subset Regression Related
+maxVarsUser = 2
+
+#Elastic Net Related
+numL1RatioUser = 10
+numLambdasUser = 20
