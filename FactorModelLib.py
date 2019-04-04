@@ -325,10 +325,13 @@ def best_subset_regression(data, dependentVar, factorNames, options):
 
     #perform linear regression
     alpha, beta = best_subset(data[factorNames].values, data[dependentVar].values, options['maxVars'])
+    #round beta values to zero
+    beta[np.abs(beta) <= 1e-7] = 0.0
     
     if (options['printLoadings'] == True):
         #Now print the results
         print_timeperiod(newData, dependentVar, options)
+        print('Max Number of Non-Zero Variables is ' + str(options['maxVars']))
 
         #Now print the factor loadings
         display_factor_loadings(alpha, beta, factorNames, options)

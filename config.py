@@ -37,7 +37,7 @@ endDateUser = '2018-12-31'
 
 
 #Best Subset Regression Related
-maxVarsUser = 2
+maxVarsUser = 3
 
 #Elastic Net Related
 numL1RatioUser = 10
