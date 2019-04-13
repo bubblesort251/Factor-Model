@@ -109,12 +109,48 @@ def create_options_cv_elastic_net():
     options = create_options()
     options['maxLambda'] = .25
     options['maxL1Ratio'] = .99
-    options['nLambdas'] = 100
-    options['nL1Ratios'] = 100
+    options['nLambdas'] = 50
+    options['nL1Ratios'] = 50
     options['randomState'] = 7777
     options['nFolds'] = 10
     return options
 
+def create_options_best_subset():
+    '''create standard options dictionary to be used as input to regression functions'''
+    options = dict()
+    options['timeperiod'] = 'all'
+    options['date'] = 'Date'
+    options['returnModel'] = False
+    options['printLoadings'] = True
+    options['maxVars'] = 3
+    return options
+
+def create_dictionary_for_analysis(method, methodDict=None):
+    '''create_dictionary_for_anlsis creates the options dictionary that can be used as an input to a factor model
+    INPUTS:
+        method: string, defines the method
+    OUTPUTS:
+        methodDict: dictionary, keys are specific options the user wants to specify, values are the values of those options
+    '''
+    if(method == 'OLS'):
+        options = create_options()
+    elif(method == 'CVLasso'):
+        options = create_options_cv_lasso()
+    elif(method == 'CVRidge'):
+        options = create_options_cv_ridge()
+    elif(method == 'CVElasticNet'):
+        options = create_options_cv_elastic_net()
+    elif(method == 'BestSubset'):
+        options = create_options_best_subset()
+    else:
+        print('Bad Method Specification for Train')
+        return
+    options['returnModel'] = True
+    options['printLoadings'] = False
+    options['date'] = 'DataDate'
+    for key in methodDict:
+        options[key] = methodDict[key]
+    return options
 
 
 
@@ -532,6 +568,8 @@ def run_factor_model(data, dependentVar, factorNames, method, options):
         return cross_validated_ridge_regression(data, dependentVar, factorNames, options)
     if (method == 'CVElasticNet'):
         return cross_validated_elastic_net_regression(data, dependentVar, factorNames, options)
+    if (method == 'BestSubset'):
+        return best_subset_regression(data, dependentVar, factorNames, options)
     else:
         print ('Method ' + method + ' not supported')
 
