@@ -32,8 +32,8 @@ assetNameUser = 'Commodities'
 dateNameUser = 'Date'
 
 #Start and End Dates for the Analysis
-startDateUser = '2001-01-01'
-endDateUser = '2018-12-31'
+startDateUser = '2008-01-01'
+endDateUser = '2018-09-30'
 
 
 #Best Subset Regression Related

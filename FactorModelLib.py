@@ -16,7 +16,7 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import GridSearchCV
 
 #Plotting Functions
-def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals = False):
+def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals = False, ylim=None):
     '''plot_returns returns a plot of the returns
     INPUTS:
         names: string, name of column to be plotted, or list, in which case it plots all of them
@@ -42,18 +42,17 @@ def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals =
     data[date] = pd.to_datetime(data[date])
 
     if (flag == 'Total Return'):
-        n = data.shape[0]
-        totalReturns = np.zeros((n,len(names)))
-        totalReturns[0,:] = 1.
-        for i in range(1,n):
-            totalReturns[i,:] = np.multiply(totalReturns[i-1,:], (1+data[names].values[i,:]))
-        for j in range(len(names)):
-            plt.semilogy(data[date], totalReturns[:,j])
-
+        data2 = data.copy()
+        data2[names] = data2[names] + 1
+        data2[names] = data2[names].cumprod()
+        for name in names:
+            plt.semilogy(data2[date], data2[name])
         plt.title('Total Return Over Time')
         plt.ylabel('Total Return')
         plt.legend(names)
         plt.xlabel('Date')
+        if(ylim!=None):
+            plt.ylim(ylim)
         plt.show()
         if(printFinalVals):
             print(totalReturns[-1])
@@ -117,13 +116,26 @@ def create_options_cv_elastic_net():
 
 def create_options_best_subset():
     '''create standard options dictionary to be used as input to regression functions'''
-    options = dict()
-    options['timeperiod'] = 'all'
-    options['date'] = 'Date'
+    options = create_options()
     options['returnModel'] = False
     options['printLoadings'] = True
     options['maxVars'] = 3
     return options
+
+def create_options_relaxed_lasso(CV=True, lambda1=.25):
+    options = create_options()
+    options['CV'] = CV
+    options['gamma'] = .5
+    if(CV):
+        options['maxLambda'] = .25
+        options['nLambdas'] = 100
+        options['randomState'] = 7777
+        options['nFolds'] = 10
+    else:
+        #Need to specify lambda1
+        options['lambda'] = .25
+    return options
+
 
 def create_dictionary_for_analysis(method, methodDict=None):
     '''create_dictionary_for_anlsis creates the options dictionary that can be used as an input to a factor model
@@ -142,6 +154,8 @@ def create_dictionary_for_analysis(method, methodDict=None):
         options = create_options_cv_elastic_net()
     elif(method == 'BestSubset'):
         options = create_options_best_subset()
+    elif(method == 'RelaxedLasso'):
+        options = create_options_relaxed_lasso()
     else:
         print('Bad Method Specification for Train')
         return
@@ -258,6 +272,8 @@ def lasso_regression(data, dependentVar, factorNames, options):
         factorNames: list, elements should be strings, names of the independent variables
         options: dictionary, should constain at least two elements, timeperiod, and date
             timeperiod: string, if == all, means use entire dataframe, otherwise filter the df on this value
+            printLoadings: boolean, if true, prints the coeficients
+
             date: name of datecol
             returnModel: boolean, if true, returns model
             alpha: float, alpha value for LASSO regression
@@ -303,6 +319,7 @@ def ridge_regression(data, dependentVar, factorNames, options):
             date: name of datecol
             returnModel: boolean, if true, returns model
             lambda: float, alpha value for Ridge regression
+            printLoadings: boolean, if true, prints the coeficients
     Outputs:
         reg: regression object from sikitlearn
         also prints what was desired
@@ -344,6 +361,7 @@ def best_subset_regression(data, dependentVar, factorNames, options):
             date: name of datecol
             returnModel: boolean, if true, returns model
             maxVars: int, maximum number of factors that can have a non zero loading in the resulting regression
+            printLoadings: boolean, if true, prints the coeficients
     Outputs:
         reg: regression object from sikitlearn
         also prints what was desired
@@ -388,6 +406,7 @@ def cross_validated_lasso_regression(data, dependentVar, factorNames, options):
             timeperiod: string, if == all, means use entire dataframe, otherwise filter the df on this value
             date: name of datecol
             returnModel: boolean, if true, returns model
+            printLoadings: boolean, if true, prints the coeficients
 
             maxLambda: float, max lambda value passed
             nLambdas: int, number of lambda values to try
@@ -407,7 +426,7 @@ def cross_validated_lasso_regression(data, dependentVar, factorNames, options):
 
     #Do CV Lasso
     alphaMax = options['maxLambda'] / (2*newData.shape[0])
-    alphas = np.linspace(1e-6, alphaMax, options['nLambdas'])
+    alphas = np.linspace(1e-12, alphaMax, options['nLambdas'])
     if(options['randomState'] == 'none'):
         lassoTest = Lasso(fit_intercept=True)
     else:
@@ -423,7 +442,7 @@ def cross_validated_lasso_regression(data, dependentVar, factorNames, options):
     if (options['printLoadings'] == True):
         #Now print the results
         print_timeperiod(newData, dependentVar, options)
-        print('best lambda = ' + str(alphaBest*2*newData.shape[0]))
+        print('Best lambda = ' + str(alphaBest*2*newData.shape[0]))
         #Now print the factor loadings
         display_factor_loadings(lassoBest.intercept_, lassoBest.coef_, factorNames, options)
 
@@ -440,6 +459,7 @@ def cross_validated_ridge_regression(data, dependentVar, factorNames, options):
             timeperiod: string, if == all, means use entire dataframe, otherwise filter the df on this value
             date: name of datecol
             returnModel: boolean, if true, returns model
+            printLoadings: boolean, if true, prints the coeficients
 
             maxLambda: float, max lambda value passed
             nLambdas: int, number of lambda values to try
@@ -459,7 +479,7 @@ def cross_validated_ridge_regression(data, dependentVar, factorNames, options):
 
     #Do CV Lasso
     alphaMax = options['maxLambda']
-    alphas = np.linspace(1e-6, alphaMax, options['nLambdas'])
+    alphas = np.linspace(1e-12, alphaMax, options['nLambdas'])
     if(options['randomState'] == 'none'):
         ridgeTest = Ridge(fit_intercept=True)
     else:
@@ -475,7 +495,6 @@ def cross_validated_ridge_regression(data, dependentVar, factorNames, options):
     if (options['printLoadings'] == True):
         #Now print the results
         print_timeperiod(newData, dependentVar, options)
-        print('best alpha = ' + str(alphaBest))
         #Now print the factor loadings
         display_factor_loadings(ridgeBest.intercept_, ridgeBest.coef_, factorNames, options)
 
@@ -492,6 +511,7 @@ def cross_validated_elastic_net_regression(data, dependentVar, factorNames, opti
             timeperiod: string, if == all, means use entire dataframe, otherwise filter the df on this value
             date: name of datecol
             returnModel: boolean, if true, returns model
+            printLoadings: boolean, if true, prints the coeficients
 
             maxLambda: float, max lambda value passed
             nLambdas: int, number of lambda values to try
@@ -512,10 +532,9 @@ def cross_validated_elastic_net_regression(data, dependentVar, factorNames, opti
 
     #Do CV Lasso
     alphaMax = options['maxLambda']/(2*newData.shape[0])
-    alphas = np.linspace(1e-6, alphaMax, options['nLambdas'])
+    alphas = np.linspace(1e-12, alphaMax, options['nLambdas'])
     l1RatioMax = options['maxL1Ratio']
     l1Ratios = np.linspace(1e-6, l1RatioMax, options['nL1Ratios'])
-
     if(options['randomState'] == 'none'):
         elasticNetTest = ElasticNet(fit_intercept=True)
     else:
@@ -532,13 +551,91 @@ def cross_validated_elastic_net_regression(data, dependentVar, factorNames, opti
     if (options['printLoadings'] == True):
         #Now print the results
         print_timeperiod(newData, dependentVar, options)
-        print('best lambda1 = ' + str(alphaBest*2*newData.shape[0]*l1RatioBest))
-        print('best lambda2 = ' + str(newData.shape[0]*alphaBest*(1-l1RatioBest)))
+        print('Best lambda1 = ' + str(alphaBest*2*newData.shape[0]*l1RatioBest))
+        print('Best lambda2 = ' + str(newData.shape[0]*alphaBest*(1-l1RatioBest)))
         #Now print the factor loadings
         display_factor_loadings(elasticNetBest.intercept_, elasticNetBest.coef_, factorNames, options)
 
     if(options['returnModel']):
         return elasticNetBest
+
+
+def relaxed_lasso_regression(data, dependentVar, factorNames, options):
+    '''cross_validated_lasso_regression takes in a dataset and returns the factor loadings using lasso regression and cross validating the choice of lambda
+    INPUTS:
+        data: pandas df, data matrix, should constain the date column and all of the factorNames columns
+        dependentVar: string, name of dependent variable
+        factorNames: list, elements should be strings, names of the independent variables
+        options: dictionary, should constain at least two elements, timeperiod, and date
+            timeperiod: string, if == all, means use entire dataframe, otherwise filter the df on this value
+            date: name of datecol
+            returnModel: boolean, if true, returns model
+            printLoadings: boolean, if true, prints the coeficients
+
+            maxLambda: float, max lambda value passed
+            nLambdas: int, number of lambda values to try
+            randomState: integer, sets random state seed
+            nFolds: number of folds
+            NOTE: SKLearn calles Lambda Alpha.  Also, it uses a scaled version of LASSO argument, so here I scale when converting lambda to alpha
+    Outputs:
+        reg: regression object from sikitlearn
+        also prints what was desired
+    '''
+    #Step 1: Build the LASSO regression
+    #Check if you cross validate
+    optionsNew = options
+    optionsNew['printLoadings'] = False
+    if(options['CV']):
+        lassoModel = cross_validated_lasso_regression(data, dependentVar, factorNames, optionsNew)
+    else:
+        lassoModel = lasso_regression(data, dependentVar, factorNames, optionsNew)
+
+    #Step 2: Extract Non-Zero Factor Loadings
+    listNonZeroLoadings = []
+    for i in range(len(factorNames)):
+        if (lassoModel.coef_[i] != 0):
+            listNonZeroLoadings.append(factorNames[i])
+
+    #Step 2a: Check if the lambda value chosen is too large
+    if(len(listNonZeroLoadings) == 0):
+        print('Lambda Value Set To Big, Model is Null Model')
+        reg = LinearRegression()
+        reg.coef_ = np.zeros((len(factorNames),))
+        reg.intercept_ = 0.0
+        return reg
+    
+    #Step 3: Run OLS using just the non-zero coeficients from the LASSO regression
+    olsReg = linear_regression(data, dependentVar, listNonZeroLoadings, optionsNew)
+
+    #Step 4: Average the two models together
+    coefs = np.zeros((len(factorNames),))
+    for i in range(len(factorNames)):
+        if(lassoModel.coef_[i] != 0):
+            ind = listNonZeroLoadings.index(factorNames[i])
+            coefs[i] = optionsNew['gamma']*lassoModel.coef_[i] + (1-optionsNew['gamma'])*olsReg.coef_[ind]
+
+    reg = LinearRegression()
+    reg.coef_ = coefs
+    reg.intercept_ = optionsNew['gamma']*lassoModel.intercept_ + (1-optionsNew['gamma'])*olsReg.intercept_
+
+    if (options['printLoadings'] == True):
+        #Now print the results
+        if(options['timeperiod'] == 'all'):
+            newData = data.copy()
+        else:
+            newData = data.copy()
+            newData = newData.query(options['timeperiod'])
+
+        print_timeperiod(newData, dependentVar, options)
+        if(options['CV']):
+            print('Best lambda = ' + str(lassoModel.alpha*2*newData.shape[0]))
+        else:
+            print('Lambda = ' + str(options['lambda']))
+        #Now print the factor loadings
+        display_factor_loadings(reg.intercept_, reg.coef_, factorNames, options)
+
+    return reg
+
 
 def run_factor_model(data, dependentVar, factorNames, method, options):
     '''run_Factor_model allows you to specify the method to create a model, returns a model object according to the method you chose
@@ -570,6 +667,8 @@ def run_factor_model(data, dependentVar, factorNames, method, options):
         return cross_validated_elastic_net_regression(data, dependentVar, factorNames, options)
     if (method == 'BestSubset'):
         return best_subset_regression(data, dependentVar, factorNames, options)
+    if (method == 'RelaxedLasso'):
+        return relaxed_lasso_regression(data, dependentVar, factorNames, options)
     else:
         print ('Method ' + method + ' not supported')
 
