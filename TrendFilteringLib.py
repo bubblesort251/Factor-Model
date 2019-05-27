@@ -86,6 +86,17 @@ def parseBetaSeries(data, regimeCol):
         l.append(1.0*previous/n)
         return l
 
+def regime_switch(betas):
+    '''returns list of starting points of each regime'''
+    n = len(betas)
+    init_points = [0]
+    curr_reg = (betas[0]>0)
+    for i in range(n):
+        if (betas[i]>0) == (not curr_reg):
+            curr_reg = not curr_reg
+            init_points.append(i)
+    init_points.append(n)
+    return init_points
 
 
 def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='Date', ymaxvar=20, pathToSavePlot = False):
@@ -114,24 +125,29 @@ def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='
     data.reset_index(drop=True, inplace=True)
     data[date] = pd.to_datetime(data[date])
 
-    listOfRegimes = parseBetaSeries(data, regimeCol)
+    regimelist = regime_switch(data[regimeCol])
+    curr_reg = np.sign(data[regimeCol][0])
 
     #Now create plot
     if (flag == 'Total Return'):
-        n = data.shape[0]
-        totalReturns = np.zeros(n)
-        totalReturns[0] = 1.
-        for i in range(1,n):
-            totalReturns[i] = totalReturns[i-1]*(1+data[factorName][i])
+        data['TotalReturns'] = data[factorName] + 1
+        data['TotalReturns'] = data['TotalReturns'].cumprod()
 
         fig, ax = plt.subplots()
-        for i in range(int(len(listOfRegimes)/2)):
-            ax.axhspan(0, ymaxvar, xmin=listOfRegimes[2*i], xmax=listOfRegimes[2*i+1], facecolor='grey', alpha=0.5)
+        for i in range(len(regimelist)-1):
+            if curr_reg == 1:
+                ax.axhspan(0, ymaxvar, xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+                       facecolor='white', alpha=0.3)
+            else:
+                ax.axhspan(0, ymaxvar, xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+                       facecolor='grey', alpha=0.5)
+            curr_reg = -1 * curr_reg
 
-        plt.semilogy(data[date], totalReturns, color='black')
+        plt.semilogy(data[date], data['TotalReturns'], color='black')
         plt.title(factorName + ' Total Return Over Time')
         plt.ylabel(factorName)
         plt.xlabel('Date')
+        plt.xlim(data[date].iloc[0],data[date].iloc[-1])
         if(pathToSavePlot):
             path = pathToSavePlot + 'RegimeGraph.png'
             plt.savefig(path)
@@ -139,14 +155,25 @@ def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='
             plt.show()
 
     elif (flag == 'Relative Return'):
-        ymaxvar = max(data[factorName])
+        ymaxvar = max(0,max(data[factorName]))
+        yminvar = min(0,min(data[factorName]))
+        lim = max(ymaxvar, -yminvar)
+
         fig, ax = plt.subplots()
-        for i in range(int(len(listOfRegimes)/2)):
-            ax.axhspan(-ymaxvar, ymaxvar, xmin=listOfRegimes[2*i], xmax=listOfRegimes[2*i+1], facecolor='grey', alpha=0.5)
+        for i in range(len(regimelist)-1):
+            if curr_reg == 1:
+                ax.axhspan(-lim, lim, xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+                       facecolor='white', alpha=0.3)
+            else:
+                ax.axhspan(-lim, lim, xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+                       facecolor='grey', alpha=0.5)
+            curr_reg = -1 * curr_reg
+
         plt.plot(data[date], data[factorName])
         plt.title(factorName + ' Returns Over Time')
         plt.ylabel(factorName)
         plt.xlabel('Date')
+        plt.xlim(data[date].iloc[0],data[date].iloc[-1])
         if(pathToSavePlot):
             path = pathToSavePlot + 'RegimeGraph.png'
             plt.savefig(path)
@@ -154,3 +181,6 @@ def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='
             plt.show()
     else:
         print ('flag variable must be either Total Return or Relative Return')
+
+
+
