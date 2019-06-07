@@ -52,7 +52,7 @@ def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals =
         plt.legend(names)
         plt.xlabel('Date')
         if(ylim!=None):
-            plt.ylim(ylim)
+            plt.ylim([0,ylim])
         plt.show()
         if(printFinalVals):
             print(totalReturns[-1])

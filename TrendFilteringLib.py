@@ -183,4 +183,71 @@ def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='
         print ('flag variable must be either Total Return or Relative Return')
 
 
+def plot_returns_by_environment(data, factorName, macroCol, date='Date', pathToSavePlot = False):
+    '''plot_returns_by_enviornment plots two time series, each defined by holding the asset in a specific macro environment
+    INPUTS:
+        factorName: string, name of column to be plotted
+        data: pd dataframe, where the data is housed
+        macroCol: string, name of the regime column in the pandas df.  Should contain 2 unique values.  1) if the return if the macro environment is true, -1 if it is false
+        flag: string, Either Total Return or Monthly Return
+        date: string, column name corresponding to the date variable
+        ymaxvar: optional argument, sets max of the plot
+        pathToSavePlot: if specified, saves the plot at the specific path instead of showing the plot
+    Outputs:
+        a plot'''
+    #Clean Inputs:
+    if(date not in data.columns):
+        print ('date column not in the pandas df')
+        return
+    if(factorName not in data.columns):
+        print ('column ' + factorName + ' not in pandas df')
+        return
+    #If the inputs are clean, create the plot
+
+    #Step 1: Parse the regime list
+
+    data = data.sort_values(date).copy()
+    data.reset_index(drop=True, inplace=True)
+    data[date] = pd.to_datetime(data[date])
+
+    regimelist = regime_switch(data[macroCol])
+    curr_reg = np.sign(data[macroCol][0])
+
+    #Now create the two time series
+    data['AboveMedian'] = data[factorName]*((data[macroCol]+1)/2)
+    data['BelowMedian'] = -1*data[factorName]*((data[macroCol]-1)/2)
+    data['AboveMedian'] = data['AboveMedian']+1
+    data['BelowMedian'] = data['BelowMedian']+1
+
+    data['AboveMedian'] = data['AboveMedian'].cumprod()
+    data['BelowMedian'] = data['BelowMedian'].cumprod()
+
+    ymaxvar = max(data['AboveMedian'].max(), data['BelowMedian'].max())
+    fig, ax = plt.subplots()
+    for i in range(len(regimelist)-1):
+        if curr_reg == 1:
+            ax.axhspan(0, ymaxvar, xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+                   facecolor='white', alpha=0.3)
+        else:
+            ax.axhspan(0, ymaxvar, xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+                facecolor='grey', alpha=0.5)
+        curr_reg = -1 * curr_reg
+
+    plt.semilogy(data[date], data['AboveMedian'], color='black')
+    plt.semilogy(data[date], data['BelowMedian'], color='yellow')
+
+    plt.title(factorName + ' Total Return Over Time by Regime')
+    plt.ylabel(factorName)
+    plt.xlabel('Date')
+    plt.xlim(data[date].iloc[0],data[date].iloc[-1])
+    plt.legend([macroCol+' Up', macroCol+' Down'])
+
+
+    if(pathToSavePlot):
+        path = pathToSavePlot + 'RegimeGraph.png'
+        plt.savefig(path)
+    else:
+        plt.show()
+
+
 
