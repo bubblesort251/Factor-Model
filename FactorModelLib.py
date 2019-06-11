@@ -37,9 +37,10 @@ def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals =
             print ('column ' + name + ' not in pandas df')
             return
     #If the inputs are clean, create the plot
-    data = data.sort_values(date).copy()
     data.reset_index(drop=True, inplace=True)
     data[date] = pd.to_datetime(data[date])
+    data = data.sort_values(date).copy()
+    
 
     if (flag == 'Total Return'):
         data2 = data.copy()
@@ -55,7 +56,7 @@ def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals =
             plt.ylim([0,ylim])
         plt.show()
         if(printFinalVals):
-            print(totalReturns[-1])
+            print(data2[names].tail(1))
     elif (flag == 'Relative Return'):
         for i in range(len(names)):
             plt.plot(data[date], data[names[i]])
