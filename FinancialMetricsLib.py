@@ -3,11 +3,20 @@
 import numpy as np #for numerical array data
 import pandas as pd #for tabular data
 
-def calc_annualized_mean_return_metrics(data, listOfFactors):
-    out = pd.DataFrame((data[listOfFactors].mean() +1)**12-1, columns=['Annual Mean Return'])
-    out['Annual SD'] = (12**.5)*data[listOfFactors].std()
-    out['t stat'] = data[listOfFactors].mean()/(data[listOfFactors].std()/(data.shape[0]**.5))
-    return out
+def calc_annualized_mean_return_metrics(data, listOfFactors, freq='monthly'):
+    if(freq=='monthly'):
+        out = pd.DataFrame((data[listOfFactors].mean() +1)**12-1, columns=['Annual Mean Return'])
+        out['Annual SD'] = (12**.5)*data[listOfFactors].std()
+        out['t stat'] = data[listOfFactors].mean()/(data[listOfFactors].std()/(data.shape[0]**.5))
+        return out
+    elif(freq=='daily'):
+        out = pd.DataFrame((data[listOfFactors].mean() +1)**252-1, columns=['Annual Mean Return'])
+        out['Annual SD'] = (252**.5)*data[listOfFactors].std()
+        out['t stat'] = data[listOfFactors].mean()/(data[listOfFactors].std()/(data.shape[0]**.5))
+        return out
+    else:
+        print('Incorrect Freq Specification')
+        return 0
 
 def calc_metrics(data, dictOfPeriods, listOfFactors, interestRate, dateCol, regimeCol, method='sharpe', timeStep='monthly'):
     '''calc_sharpe_ratio_by_regime returns the sharpe ratio, broken out by time period and regime for set of series
