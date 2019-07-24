@@ -14,6 +14,7 @@ from sklearn.linear_model import Ridge
 from sklearn.linear_model import ElasticNet
 from sklearn.model_selection import KFold
 from sklearn.model_selection import GridSearchCV
+import statsmodels.api as sm
 
 #Plotting Functions
 def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals = False, ylim=None):
@@ -37,6 +38,7 @@ def plot_returns(data, names, flag='Total Return', date='Date', printFinalVals =
             print ('column ' + name + ' not in pandas df')
             return
     #If the inputs are clean, create the plot
+    data = data.copy()
     data.reset_index(drop=True, inplace=True)
     data[date] = pd.to_datetime(data[date])
     data = data.sort_values(date).copy()
@@ -758,7 +760,30 @@ def data_time_periods(data, dateName):
     else:
         return 'daily'
 
-
+def run_reg(data, depVar, indVars, returnTable=False):
+    '''run_reg runs an OLS regression, and returns the important information
+    INPUTS:
+        data: pandas df, columns should include factor and dependentVars
+        depVar: string, dependent var in regression
+        indVars: list, elements are strings, define the independent vars
+        returnTable: Boolean, if true, returns a table containing the betas, standard errors and t statistics
+    OUTPUTS:
+        out: pandas df, first col is the Beta / Intercept, second col is standard error, third is t statistics
+    '''
+    X = data[indVars]
+    y = data[depVar]
+    X2 = sm.add_constant(X)
+    est = sm.OLS(y, X2)
+    est2 = est.fit()
+    print(est2.summary())
+    if(returnTable):
+        out = np.zeros((len(indVars)+1,3))
+        out[:,0] = est2.params
+        out[:,1] = est2.bse
+        out[:,2] = est2.tvalues
+        l = ['Intercept'] + indVars
+        out = pd.DataFrame(out, columns=['Betas', 'Standard Error', 'T-Statistic'], index=l)
+        return out
 
 
 

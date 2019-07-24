@@ -99,7 +99,7 @@ def regime_switch(betas):
     return init_points
 
 
-def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='Date', ymaxvar=20, pathToSavePlot = False):
+def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='Date', ymaxvar=None, pathToSavePlot = False):
     '''plot_returns returns a plot of the returns
     INPUTS:
         factorName: string, name of column to be plotted
@@ -107,7 +107,6 @@ def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='
         regimeCol: string, name of the regime column in the pandas df: data
         flag: string, Either Total Return or Monthly Return
         date: string, column name corresponding to the date variable
-        ymaxvar: optional argument, sets max of the plot
         pathToSavePlot: if specified, saves the plot at the specific path instead of showing the plot
     Outputs:
         a plot'''
@@ -132,6 +131,8 @@ def plot_returns_regime(data, factorName, regimeCol, flag='Total Return', date='
     if (flag == 'Total Return'):
         data['TotalReturns'] = data[factorName] + 1
         data['TotalReturns'] = data['TotalReturns'].cumprod()
+        if(ymaxvar is None):
+            ymaxvar = data.loc[data.shape[0]-1,'TotalReturns']
 
         fig, ax = plt.subplots()
         for i in range(len(regimelist)-1):

@@ -2,6 +2,10 @@
 
 import numpy as np #for numerical array data
 import pandas as pd #for tabular data
+import math
+import statsmodels.api as sm
+from scipy import stats
+import matplotlib.pyplot as plt
 
 def calc_annualized_mean_return_metrics(data, listOfFactors, freq='monthly'):
     if(freq=='monthly'):
@@ -18,14 +22,73 @@ def calc_annualized_mean_return_metrics(data, listOfFactors, freq='monthly'):
         print('Incorrect Freq Specification')
         return 0
 
+def max_drawdown(data, dictOfPeriods, listOfFactors, interestRate, dateCol, regimeCol, timeStep='monthly'):
+    '''This will be a max drawdown code'''
+    #Step 1: Define the output matrix
+    originalCols = list(dictOfPeriods.keys())
+    newCols = []
+    for col in originalCols:
+        newCols.append(col)
+        newCols.append(col + ' TTR')
+    out = pd.DataFrame(np.zeros((len(listOfFactors),2*len(list(dictOfPeriods.keys())))),
+                        columns=newCols, index=listOfFactors)
+
+    #Step 2: Calculate current drawdown at each time step for each factor
+    dataCumProd = data.copy()
+    dataCumProd[listOfFactors] = dataCumProd[listOfFactors]+1
+    dataCumProd[listOfFactors] = dataCumProd[listOfFactors].cumprod()
+
+    dataCumMax = dataCumProd.copy()
+    dataCumMax[listOfFactors] = dataCumMax[listOfFactors].cummax()
+
+    dataCurrDrawdown = data.copy()
+
+    dataCurrDrawdown[listOfFactors] = dataCumProd[listOfFactors]/dataCumMax[listOfFactors]
+
+
+    #Calculate Current Drawdown
+    for periodName in dictOfPeriods.keys():
+        dateSet = dictOfPeriods[periodName]
+        data2 = dataCurrDrawdown.copy()
+        data2 = data2[(data2[dateCol] >= dateSet['startDate']) & (data2[dateCol] <= dateSet['endDate'])]
+        if(dateSet['Regime'] is not None):
+            data2 = data2[data2[regimeCol] == dateSet['Regime']]
+
+        for factor in listOfFactors:
+            out.loc[factor,periodName] = data2[factor].min()
+
+
+    for factor in listOfFactors:
+        for periodName in dictOfPeriods.keys():
+            val = out.loc[factor, periodName]
+            indOfMaxDrawdown = dataCurrDrawdown[dataCurrDrawdown[factor] == val].index[0]
+            data2 = dataCurrDrawdown.loc[indOfMaxDrawdown:,:].copy()
+            try:
+                indOfRecoveryDrawdown = data2[data2[factor] >= 1].index[0]
+            except:
+                indOfRecoveryDrawdown = np.Inf
+            #Calculate Time to Recovery
+            out.loc[factor, periodName+' TTR'] = indOfRecoveryDrawdown - indOfMaxDrawdown
+
+    #So far, the drawdown is expressed as proportion of the maximum, we want to express it as proportion below the maximum
+    for periodName in dictOfPeriods.keys():
+        out[periodName] = 1 - out[periodName]
+
+    return out
+
 def calc_metrics(data, dictOfPeriods, listOfFactors, interestRate, dateCol, regimeCol, method='sharpe', timeStep='monthly'):
     '''calc_sharpe_ratio_by_regime returns the sharpe ratio, broken out by time period and regime for set of series
     Sharpe Ratio and Log Return are annualized.  Mean return is not
     '''
+    #Step 1: check if the time period is correctly specified
     if(timeStep not in ['monthly', 'daily', 'yearly']):
         print('Incorrect argument for timeStep')
         return 0
+    #Step 2: Run max_drawdown code if specified
+    if(method=='max_drawdown'):
+        return max_drawdown(data, dictOfPeriods, listOfFactors, interestRate, dateCol, regimeCol, timeStep=timeStep)
 
+    #Step 3: Otherwise, run normal analysis
     out = pd.DataFrame(np.zeros((len(listOfFactors),len(list(dictOfPeriods.keys())))),
                         columns=list(dictOfPeriods.keys()), index=listOfFactors)    
     for periodName in dictOfPeriods.keys():
@@ -238,3 +301,120 @@ def calc_conditional_metrics(data, listOfFactors, splitCol, interestRate, naming
             cols.append(namingDict[splitVals[j]])
         out = pd.DataFrame(vals, columns=cols, index=listOfFactors)
     return out
+
+def calc_participation(data, listOfFactors, referenceCol):
+    '''cal_participation calculates the upside / downside participation and the particiption ratio difference
+    INPUTS:
+        data: pandas df, must contain columns listOfFactors and referenceCol
+        listOfFactors: list, elements are strings, indicating which columns should be included in the calculation
+        referenceCol: string, indicating which column is used as the benchmark
+    OUTPUTS:
+        out: pandas df, columns are {Upside Ratio, Downside Ratio, PRD}, index is the factors in listOfFactors
+    '''
+    #Step 1: Breakt into upside and downside
+    upsideData = data[data[referenceCol] > 0].copy()
+    downsideData = data[data[referenceCol] < 0].copy()
+
+    out = pd.DataFrame(upsideData[listOfFactors].mean()/upsideData[referenceCol].mean(), columns=['Upside Participation'])
+    out['Downside Participation'] = downsideData[listOfFactors].mean()/downsideData[referenceCol].mean()
+    out['PRD'] = out['Upside Participation'] - out['Downside Participation']
+
+    return out
+
+def hurst_ratio_calc(data, listOfFactors, plotFactor = None):
+    '''hurst_ratio_cal calculates the hurst ratio for listOfFactors
+    INPUTS:
+        data: pandas df, must contain listOfFactors
+        listOfFactors: list, elements are strings, names of columns you wish to copy
+    OUTPUTS:
+        out: df, columns are listOfFactors, rows are (R/S)_t'''
+    #Part 1: Calculate the rescaled range series
+    #Step 1: Calculate Y_t
+    data.reset_index(inplace=True, drop=True)
+    Yt = data[listOfFactors].copy()
+    Yt = Yt - data[listOfFactors].mean()
+    #Step 2: Calculate Z_t
+    Zt = Yt.cumsum()
+    #Step 3: Calculate R_t
+    Rt = Zt.cummax() - Zt.cummin()
+    #Step 4: Calculate St
+    St = np.zeros((data.shape[0], len(listOfFactors)))
+    for i in range(St.shape[0]):
+        St[i,:] = data.loc[0:i,listOfFactors].std()
+    St = pd.DataFrame(St, columns=listOfFactors)
+    #Step 5: Calculate (R/S)_t
+    rangeSeries = Rt/St
+    #Part 2: Run Regressions using the powers of t
+    rangeSeries['t'] = rangeSeries.index
+    rangeSeries = rangeSeries[['t'] + listOfFactors]
+    rangeSeries = rangeSeries.loc[1:,:]
+    logSeries = rangeSeries.applymap(math.log)/math.log(2)
+    
+    out = np.zeros((len(listOfFactors), 2))
+    inds = [2**x for x in range(4,math.floor(math.log(logSeries.shape[0],2))+1)]
+    filtered = logSeries.loc[inds, :].copy()
+    for i in range(len(listOfFactors)):
+        #Run Regression
+        l = ['t']
+        X = filtered[l]
+        y = filtered[listOfFactors[i]]
+        X2 = sm.add_constant(X)
+        est = sm.OLS(y, X2)
+        est2 = est.fit()
+        #if(listOfFactors[i]=='RMW'):
+            #print(est2.summary())
+        #Store to pandas df
+        out[i,0] = est2.params.t
+        out[i,1] = est2.bse.t
+
+        if(plotFactor == listOfFactors[i]):
+            #Make a plot
+            plt.plot(X,y, 'o')
+            predicted = X*est2.params.t + est2.params.const
+            plt.plot(X,predicted)
+            plt.title('Plot of Line of Best Fit verses log((R/S)_t) vs log(t) for ' + plotFactor)
+            plt.legend(['log((R/S)_t)', 'Line of Best Fit'])
+            plt.xlabel('Log(t)')
+            plt.ylabel('(R/S)_t')
+            plt.show()
+
+    if(plotFactor is None):
+        out = pd.DataFrame(out, columns=['Hurst Coef', 'Std Error'], index=listOfFactors)
+        return out
+
+def hurst_ratio_over_time(data, listOfFactors, dateCol, breakNum = 1025):
+    '''hurst_ratio_over_time calcualtes the hurst ratio over time
+    INPUTS:
+        data: pandas df, must contain listOFFactors in it's columns
+        listOfFactors: list, elements are strings
+        breakNum: int, number of days to include
+        dateCol: string, names the date column in data
+    OUTPUTS:
+        out: pandas df, contains the listOFactors and the date
+    '''
+    nPeriods = int(np.ceil(data.shape[0]/breakNum))
+    out = np.zeros((nPeriods,len(listOfFactors)))
+    dates = []
+
+    for i in range(nPeriods):
+        currPeriodData = data[listOfFactors].loc[i*breakNum:min((i+1)*breakNum-1,data.shape[0]-1),listOfFactors].copy()
+        hurstRatioForPeriod = hurst_ratio_calc(currPeriodData, listOfFactors)
+        out[i,:] = hurstRatioForPeriod['Hurst Coef']
+        dates.append(data.loc[min((i+1)*breakNum-1,data.shape[0]-1),dateCol])
+
+    out = pd.DataFrame(out, columns=listOfFactors)
+    out['Date'] = dates
+    out = out[['Date'] + listOfFactors]
+
+    return out
+
+
+
+
+
+
+
+
+
+
+

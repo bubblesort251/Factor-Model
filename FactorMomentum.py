@@ -5,6 +5,7 @@ from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 import numpy as np
+import math
 
 
 
@@ -43,6 +44,7 @@ def compute_simple_factor_momentums(data, listOfFactors, lookbackWindow=[12, 1],
             negRet = data.loc[i, neg].mean()
         else:
             negRet = 0
+            
         vals[i-lookbackWindow[0],0] = posRet
         vals[i-lookbackWindow[0],1] = negRet
         vals[i-lookbackWindow[0],2] = posRet - negRet
@@ -61,100 +63,7 @@ def compute_simple_factor_momentums(data, listOfFactors, lookbackWindow=[12, 1],
     out = out[['Date', 'TSMOMPos', 'TSMOMNeg','TSMOMNet','CSMOMPos', 'CSMOMNeg', 'CSMOMNet']].copy()
     return out
 
-def compute_factor_momentum(data, listOfFactors, lookbackWindow=[12, 1], dateCol='Date', typeOfMOM='TS', method='equal', volHistory=[12,1]):
-    '''compute_factor_momentum takes a data set, and computes the time series and cross sectional factor momentum
-    INPUTS:
-        data: pandas df, columns should include listOfFactors
-        listOfFactors: list, set of factors to include
-        lookbackWindow: set of months to use.  Time period to consider it t-lookbackWindow[0], t-lokbackWindow[1].  Second argument must be geq 1
-        typeOfMOM: string, acceptable inputs are TS or CS.  For time series factor momentum or cross sectional factor momentum
-        method: string, acceptable inputs are 'equal' or 'rps' for equal weight or risk parity (simplified), weighting scheme
-        volHistory: string, number of data points to use in volatility calculation
-    OUTPUTS:
-        out: pandas df, should be TSMOM, CSMOM, and Date
-            TSMOM: Time series momentum, split into positive, negative and net
-            CSMOM: Cross sectional momentum, split into positive, negative and net
-            Date: Date Col
-    '''
-    #Perform basic input checks
-    if(dateCol not in list(data.columns)):
-        print(dateCol + ' Columm not in data')
-        return 0
-    if(typeOfMOM not in ['TS','CS']):
-        print('Incorrect value for typeOfMOM')
-        return 0
-    if(method not in ['equal', 'srp', 'rp']):
-        print('Incorrect value for method')
-        return 0
-    vals = np.zeros((data.shape[0] - lookbackWindow[0], 3))
-    #Fill in Date Column
-    for i in range(lookbackWindow[0], data.shape[0]):
-        #Compute cumulative return over lookback window
-        new = data.loc[i-lookbackWindow[0]:i-lookbackWindow[1], listOfFactors].copy()
-        ret = new + 1
-        ret = ret.product()
-        ret = ret - 1
-        #Check Method to define set of factors to use
-        if(typeOfMOM == 'TS'):
-            #Get list of Factors with Positive Return over lookback period
-            pos = list(ret[ret > 0].index)
-            #Get list of Factors with Negative Return over lookback period
-            neg = list(ret[ret < 0].index)
-
-        elif(typeOfMOM == 'CS'):
-            #Get list of factors with above median return over lookback period
-            pos = list(ret[ret > ret.median()].index)
-            #Get list of factor with below median return over lookback period
-            neg = list(ret[ret < ret.median()].index)
-
-        #Now, compute return on the positive leg of the time series momentum
-        if(len(pos) != 0):
-            if(method== 'equal'):
-                posRet = data.loc[i, pos].mean()
-            elif(method == 'srp'):
-                posVol = data.loc[max(i-volHistory[0],0):max(i-volHistory[1],0), pos].std()
-                weights = 1/posVol
-                weights = weights/weights.sum()
-                posRet = data.loc[i, pos].transpose().dot(weights)
-            elif(method=='rp'):
-                covarMatrix = data.loc[max(i-volHistory[0],0):max(i-volHistory[1],0), pos].cov()
-                weights = calc_risk_parity_weights(covarMatrix)
-                posRet = data.loc[i, pos].transpose().dot(weights)
-        else:
-            posRet = 0
-
-        if(len(neg) != 0):
-            if(method== 'equal'):
-                negRet = data.loc[i, neg].mean()
-            elif(method == 'srp'):
-                negVol = data.loc[max(i-volHistory[0],0):max(i-volHistory[1],0), neg].std()
-                weights = 1/negVol
-                weights = weights/weights.sum()
-                negRet = data.loc[i, neg].transpose().dot(weights)
-            elif(method=='rp'):
-                covarMatrix = data.loc[max(i-volHistory[0],0):max(i-volHistory[1],0), neg].cov()
-                weights = calc_risk_parity_weights(covarMatrix)
-                negRet = data.loc[i, neg].transpose().dot(weights)
-        else:
-            negRet = 0
-        vals[i-lookbackWindow[0],0] = posRet
-        vals[i-lookbackWindow[0],1] = negRet
-        vals[i-lookbackWindow[0],2] = posRet - negRet
-
-    #Determine the column names
-    if(typeOfMOM == 'TS'):
-        cols = ['TSMOMPos', 'TSMOMNeg','TSMOMNet']
-    elif(typeOfMOM == 'CS'):
-        cols = ['CSMOMPos', 'CSMOMNeg', 'CSMOMNet']
-        
-    out = pd.DataFrame(vals, columns=cols)
-    out['Date'] = data.loc[lookbackWindow[0]:data.shape[0],dateCol].values
-    cols = ['Date'] + cols
-    out = out[cols].copy()
-    return out
-
-
-def compute_factor_momentum_with_nan(data, listOfFactors, lookbackWindow=[12, 1], dateCol='Date', typeOfMOM='TS', method='equal', volHistory=[12,1]):
+def compute_factor_momentum(data, listOfFactors, lookbackWindow=[12, 1], dateCol='Date', typeOfMOM='TS', method='equal', volHistory=[12,1], topN=False):
     '''compute_factor_momentum takes a data set, and computes the time series and cross sectional factor momentum
     INPUTS:
         data: pandas df, columns should include listOfFactors
@@ -210,10 +119,33 @@ def compute_factor_momentum_with_nan(data, listOfFactors, lookbackWindow=[12, 1]
             neg = list(ret[ret < 0].index)
 
         elif(typeOfMOM == 'CS'):
-            #Get list of factors with above median return over lookback period
-            pos = list(ret[ret > ret.median()].index)
-            #Get list of factor with below median return over lookback period
-            neg = list(ret[ret < ret.median()].index)
+            if(topN==False):
+                #Get list of factors with above median return over lookback period
+                pos = list(ret[ret > ret.median()].index)
+                #Get list of factor with below median return over lookback period
+                neg = list(ret[ret < ret.median()].index)
+
+            elif(topN >=1):
+                pos = list(ret.index)
+                l = ret.shape[0]
+                pos = pos[:min(l,topN)]
+                #Get list of factor with below median return over lookback period
+                neg = list(ret.index)
+                neg = neg[-min(l,topN):]
+
+            elif((topN <1) & (topN > 0)):
+                pos = list(ret.index)
+                l = math.ceil(len(pos)*topN)
+                pos = pos[:l]
+                #Get list of factor with below median return over lookback period
+                neg = list(ret.index)
+                l = math.ceil(len(neg)*topN)
+                neg = neg[-l:]
+
+            else:
+                print('Invalid Value for variable topN')
+                return 0
+
 
         #Now, compute return on the positive leg of the time series momentum
         if(len(pos) != 0):
@@ -246,6 +178,7 @@ def compute_factor_momentum_with_nan(data, listOfFactors, lookbackWindow=[12, 1]
                 negRet = data2.loc[i, neg].transpose().dot(weights)
         else:
             negRet = 0
+        
         vals[i-lookbackWindow[0],0] = posRet
         vals[i-lookbackWindow[0],1] = negRet
         vals[i-lookbackWindow[0],2] = posRet - negRet
@@ -316,7 +249,7 @@ def compute_portfolio_returns(data, listOfFactors, dateCol, weightingScheme='equ
         out[dateCol] = data.loc[volHistory[0]:data.shape[0],dateCol].values
         return out[[dateCol,'Risk Parity Return']]
 
-    else:
+    elif(weightingScheme=='cap'):
         #This means you are cap weighted
         weights = pd.DataFrame(1/len(listOfFactors), index=listOfFactors, columns=['Weights'])
         vals = np.zeros((data.shape[0], 1))
@@ -333,13 +266,13 @@ def compute_portfolio_returns(data, listOfFactors, dateCol, weightingScheme='equ
         return out[[dateCol,'Cap Weighted Return']]
 
 
-def create_index_with_unbalanced_data(data, listOfAssets, dateCol, weightScheme='cap', fillVal=0):
+def create_index_with_unbalanced_data(data, listOfAssets, dateCol, weightingScheme='cap', fillVal=0):
     '''create_index_with_unbalanced_data creates an unbalanced '''
-    if(weightScheme=='equal_ignore_missing'):
+    if(weightingScheme=='equal_ignore_missing'):
         out = pd.DataFrame(data[listOfAssets].mean(axis=1), columns=['Returns'])
         out[dateCol] = data[dateCol]
         return out[[dateCol, 'Returns']]
-    elif(weightScheme=='equal_fill_missing'):
+    elif(weightingScheme=='equal_fill_missing'):
         data2 = data.copy()
         data2.fillna(fillVal, inplace=True)  
         indexOfBeginnings = data2[listOfAssets].ne(fillVal).idxmax()
@@ -366,7 +299,7 @@ def create_index_with_unbalanced_data(data, listOfAssets, dateCol, weightScheme=
         out[dateCol]=data2[dateCol]
         return out[[dateCol,'Returns', 'Effective Asset Number']]
         
-    elif(weightScheme=='cap'):
+    elif(weightingScheme=='cap'):
         data2 = data.copy()
         data2.fillna(fillVal, inplace=True)  
         indexOfBeginnings = data2[listOfAssets].ne(fillVal).idxmax()
@@ -411,7 +344,7 @@ def create_index_with_unbalanced_data(data, listOfAssets, dateCol, weightScheme=
         return out[[dateCol,'Returns','Effective Asset Number']]
 
 #Leverage Functions
-def dynamic_leverage(data, baseCol, colsToLever, dateCol, lookbackWindow=[12,1]):
+def dynamic_leverage(data, baseCol, colsToLever, borrowCostCol, dateCol='Date', lookbackWindow=[12,1]):
     '''dynamic leverage scales the returns of colsToLever to match the volatility of baseCol
     INPUTS:
         data: pandas df, needs to contain baseCol, colsToLever and dateCol amoung it's columns
@@ -432,7 +365,7 @@ def dynamic_leverage(data, baseCol, colsToLever, dateCol, lookbackWindow=[12,1])
         #Store Leverage in the vals array
         vals[i-lookbackWindow[0],0] = vols[baseCol]
         vals[i-lookbackWindow[0],1:len(colsToLever)+1] = leverage[colsToLever]
-        vals[i-lookbackWindow[0],len(colsToLever)+1:] = leverage[colsToLever]*data.loc[i,colsToLever]
+        vals[i-lookbackWindow[0],len(colsToLever)+1:] = leverage[colsToLever]*data.loc[i,colsToLever] - (leverage[colsToLever]-1)*data.loc[i,borrowCostCol]
     
     leverageNames = [name + ' Leverege Ratio' for name in colsToLever]
     leveredNames = [name + ' DL Return' for name in colsToLever]
@@ -450,8 +383,6 @@ def static_leverage(data, colsToLever, leverage, borrowCostCol, dateCol='Date'):
         newColName = col + ' Levered ' + str(leverage) + 'x'
         data2[newColName] = data[col]*leverage - (leverage-1)*data[borrowCostCol]
     return data2
-
-
 
 
 #The code below calculates the Full Risk Parity Nonsense
